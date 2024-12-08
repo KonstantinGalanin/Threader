@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gomodule/redigo/redis"
+	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -27,15 +28,29 @@ var (
 )
 
 func main() {
-	redisConn, err := redis.DialURL("redis://user:@localhost:6379/0")
+	err := godotenv.Load()
+
+	redisURL := "redis://"
+	if redisUser := os.Getenv("REDIS_USER"); redisUser != "" {
+		redisURL += redisUser + ":@"
+	}
+	redisURL += "localhost:6379/0"
+	redisConn, err := redis.DialURL(redisURL)
+
 	if err != nil {
 		logrus.WithError(err).Fatal("Conn redis error")
 	}
 	redisManager := sessionRepository.NewSessionManagerRedis(redisConn)
 
-	dsn := "root:love@tcp(localhost:3306)/users?"
-	dsn += "&charset=utf8"
-	dsn += "&interpolateParams=true"
+
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+
+	dsn := dbUser + ":" + dbPass + "@tcp(" + dbHost + ":" + dbPort + ")/" + dbName + "?"
+	dsn += "&charset=utf8&interpolateParams=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		logrus.WithError(err).Fatal("Open mysql error")
@@ -54,7 +69,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	sessMongo, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost"))
+	sessMongo, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_URI")))
 	if err != nil {
 		logrus.WithError(err).Fatal("Open mongodb error")
 	}
